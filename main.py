@@ -19,6 +19,7 @@ def chunk(it, size):
     it = iter(it)
     return iter(lambda: tuple(itertools.islice(it, size)), ())
 
+
 if __name__ == "__main__":
 
     # read in price data

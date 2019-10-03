@@ -27,8 +27,6 @@ class MonteCarloSimulation(object):
        """
         return np.sqrt(N) * (returns.mean() / returns.std())
 
-
-
     def movingAverageStrategy(self, shortMovingAvg, longMovingAvg):
         """To calculate Moving Average Strategy
 
