@@ -11,7 +11,7 @@ These are collections of modules to perform different complex financial calculat
 
 Simulations
 -------------
--Monte Carlo
+-Monte Carlo - [Credits: https://pythonforfinance.net/2019/04/19/multi-threading-trading-strategy-back-tests-and-monte-carlo-simulations-in-python/]
 
 How To Use This
 ---------------
