@@ -1,10 +1,10 @@
 import numpy as np
-from multiprocessing.pool import ThreadPool, Pro as Pool
+from multiprocessing.pool import ThreadPool as Pool
 
 
 class MonteCarloSimulation(object):
 
-    def __init__(self, data, inputs, numberOfIterations, days=252, spreadDiffThreshold=5):
+    def __init__(self, data, inputs, numberOfIterations, numberOfHistoricalDays=252, spreadDiffThreshold=5):
         """ Base MonteCarlo Simulation
 
         Parameters:
@@ -16,10 +16,10 @@ class MonteCarloSimulation(object):
         self.data = data
         self.inputs = inputs
         self.numberOfIterations = numberOfIterations
-        self.days = days
+        self.numberOfHistoricalDays = numberOfHistoricalDays
         self.spreadDiffThreshold = spreadDiffThreshold
 
-    def annualisedSharpe(self, returns, numberOfHistoricalDays=252):
+    def annualisedSharpe(self, returns):
         """To calculate Sharpe Ratio - Sharpe ratio measures the performance of an
             investment compared to a risk-free asset, after adjusting for its risk.
             Risk free rate element excluded for simplicity
@@ -28,9 +28,9 @@ class MonteCarloSimulation(object):
         returns (DataFrame): Strategy data
         N (int): Number of historical days for simulation
        """
-        if returns.std() == 0:
-            return 0
-        return np.sqrt(numberOfHistoricalDays) * (returns.mean() / returns.std())
+
+        return np.sqrt(self.numberOfHistoricalDays) * (returns.mean() / returns.std())
+
 
     def movingAverageStrategy(self, shortMovingAvg, longMovingAvg):
         """To calculate Moving Average Strategy
@@ -60,11 +60,14 @@ class MonteCarloSimulation(object):
         data['Strategy Equity'] = data['Strategy'].cumsum()
 
         """calculate Sharpe Ratio"""
-        sharpe = self.annualisedSharpe(data['Strategy'])
+        try:
+            sharpe = self.annualisedSharpe(data['Strategy'])
+        except:
+            sharpe = 0
 
         return data['Strategy'].cumsum(), sharpe, data['Strategy'].mean(), data['Strategy'].std()
 
-    def run(self, inputSlices):
+    def strategy(self, inputSlices):
         """To start the simulation
 
         :param inputSlices:
@@ -73,17 +76,17 @@ class MonteCarloSimulation(object):
         # iterate through the slice of the overall MA window tuples list that
         # has been passed to this thread
 
-        for input_slice in inputSlices:
+        for inputSlice in inputSlices:
             # use the current inputs to backtest the strategy and record
             # various results metrics
-            perf, sharpe, mu, sigma = self.movingAverageStrategy(input_slice[0], input_slice[1])
+            perf, sharpe, mu, sigma = self.movingAverageStrategy(inputSlice[0], inputSlice[1])
 
             # create two empty lists to store results of MC simulation
             mc_results = []
             mc_results_final_val = []
             # run the specified number of MC simulations and store relevant results
             for j in range(self.numberOfIterations):
-                daily_returns = np.random.normal(mu, sigma, self.days) + 1
+                daily_returns = np.random.normal(mu, sigma, self.numberOfHistoricalDays) + 1
                 price_list = [1]
                 for x in daily_returns:
                     price_list.append(price_list[-1] * x)
@@ -94,10 +97,13 @@ class MonteCarloSimulation(object):
                 mc_results_final_val.append(price_list[-1])
         return inputSlices, perf, sharpe, mu, sigma, mc_results, mc_results_final_val
 
+def monteCarloStrategy(data, inputs, numberOfIterations, numberOfHistoricalDays):
+    mc = MonteCarloSimulation(data, inputs, numberOfIterations,
+                                            numberOfHistoricalDays=numberOfHistoricalDays)
 
-class ParallelMonteCarloSimulation(MonteCarloSimulation):
+class NonParallelMonteCarloSimulation():
 
-    def __init__(self, data, inputs, numberOfIterations, days=252):
+    def __init__(self, data, inputs, numberOfIterations, numberOfHistoricalDays=252):
         """Multi-threading implementation of Monte Carlo simulation
 
         :param data:
@@ -105,14 +111,45 @@ class ParallelMonteCarloSimulation(MonteCarloSimulation):
         :param numberOfIterations:
         :param days:
         """
-        super(ParallelMonteCarloSimulation, self).__init__(data, inputs, numberOfIterations, days=days)
+        self.inputs = inputs
+        self.data = data
+        self.numberOfIterations = numberOfIterations
+        self.numberOfHistoricalDays = numberOfHistoricalDays
 
-    def run(self):
+    def simulate(self):
         """Start the Parallel Monte Carlo simulations
 
         :return: Moving Average
         """
         pool = Pool(5)
-        future_res = [pool.apply_async(MonteCarloSimulation.run, args=(self, self.inputs[i])) for i in range(len(self.inputs))]
+        samples= monteCarloStrategy(self.data, self.inputs, self.numberOfIterations, self.numberOfHistoricalDays)
+        return samples
+
+class ParallelMonteCarloSimulation():
+
+    def __init__(self, data, inputs, numberOfIterations, numberOfHistoricalDays=252):
+        """Multi-threading implementation of Monte Carlo simulation
+
+        :param data:
+        :param inputs:
+        :param numberOfIterations:
+        :param days:
+        """
+        self.inputs = inputs
+        self.data = data
+        self.numberOfIterations = numberOfIterations
+        self.numberOfHistoricalDays = numberOfHistoricalDays
+
+    def simulate(self):
+        """Start the Parallel Monte Carlo simulations
+
+        :return: Moving Average
+        """
+        pool = Pool(5)
+        future_res = [pool.apply_async(monteCarloStrategy,
+                                       args=(self.data,
+                                             self.inputs[i],
+                                             self.numberOfIterations,
+                                             self.numberOfHistoricalDays)) for i in range(len(self.inputs))]
         samples = [f.get() for f in future_res]
         return samples

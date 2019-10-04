@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import itertools
 import time
-from simulations.monte_carlo import ParallelMonteCarloSimulation, MonteCarloSimulation
+from simulations.monte_carlo import ParallelMonteCarloSimulation, NonParallelMonteCarloSimulation
 
 
 def chunk(it, size):
@@ -42,11 +42,12 @@ if __name__ == "__main__":
     """set requried number of MC simulations per backtest optimisation"""
     numberOfIterations = 2000
 
-    """start timer"""
     start_time = time.time()
-
     """call our multi-threaded function"""
-    results = ParallelMonteCarloSimulation(data, mas_combined_split, numberOfIterations).run()
-    #results = MonteCarloSimulation(data, mas_combined_split, numberOfIterations).run(mas_combined_split)
-    """print number of seconds the process took"""
-    print("MP--- %s seconds for para---" % (time.time() - start_time))
+    results = NonParallelMonteCarloSimulation(data, mas_combined, numberOfIterations).simulate()
+    print("MP--- %s seconds for non-parallel monte carlo simulations---" % (time.time() - start_time))
+
+    start_time = time.time()
+    """call our multi-threaded function"""
+    results = ParallelMonteCarloSimulation(data, mas_combined_split, numberOfIterations).simulate()
+    print("MP--- %s seconds for parallel monte carlo simulations---" % (time.time() - start_time))
